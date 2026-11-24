@@ -124,8 +124,23 @@ public class GameWorld
         {
             var type = (ShipType)_rng.Next(3);
             bool movingRight = _rng.Next(2) == 0;
-            Ships.Add(new Ship(type, movingRight));
-            _spawnTimer = (1.5 + _rng.NextDouble() * 2) / Difficulty;
+            var candidate = new Ship(type, movingRight);
+
+            // Ships already in this lane decide the direction, so nobody sails through each other
+            var laneShip = Ships.Find(s => s.Lane == candidate.Lane);
+            if (laneShip != null && laneShip.MovingRight != movingRight)
+                candidate = new Ship(type, laneShip.MovingRight);
+
+            if (HasRoomToSpawn(candidate))
+            {
+                Ships.Add(candidate);
+                _spawnTimer = (1.5 + _rng.NextDouble() * 2) / Difficulty;
+            }
+            else
+            {
+                // Lane is busy at the entry point: try again shortly
+                _spawnTimer = 0.3;
+            }
         }
 
         foreach (var ship in Ships)
@@ -135,6 +150,22 @@ public class GameWorld
         }
 
         Ships.RemoveAll(s => s.IsOffScreen);
+    }
+
+    // True if the last ship in this lane has sailed at least one ship length away from the entry point
+    private bool HasRoomToSpawn(Ship candidate)
+    {
+        foreach (var s in Ships)
+        {
+            if (s.Lane != candidate.Lane) continue;
+
+            double gap = candidate.MovingRight
+                ? s.X - (candidate.X + candidate.Width)   // Entering from the left: space to the ship ahead
+                : candidate.X - (s.X + s.Width);          // Entering from the right
+
+            if (gap < s.Width) return false;
+        }
+        return true;
     }
 
     private void TryDropDepthCharge(Ship ship, double dt)

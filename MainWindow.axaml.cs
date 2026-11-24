@@ -6,11 +6,14 @@ namespace SeaHunter;
 
 public partial class MainWindow : Window
 {
+    private int _periscopeTorpedoes;
+
     public MainWindow()
     {
         InitializeComponent();
 
-        // The canvas tells us when the player has lost
+        // The canvas tells us when each part of the game ends
+        Game.SideViewOver += OnSideViewOver;
         Game.GameOver += OnGameOver;
 
         StartHighScoreList.ItemsSource = HighScoreStore.Format(HighScoreStore.Load());
@@ -30,7 +33,24 @@ public partial class MainWindow : Window
     {
         StartScreen.IsVisible = false;
         GameOverScreen.IsVisible = false;
+        PeriscopeIntroScreen.IsVisible = false;
         Game.StartNewGame();
+    }
+
+    // Side view is over: show how many torpedoes the periscope round gets
+    private void OnSideViewOver(int score, int level)
+    {
+        _periscopeTorpedoes = level * PeriscopeWorld.TorpedoesPerLevel;
+
+        LevelReachedText.Text = $"LEVEL {level} REACHED   SCORE {score:D6}";
+        TorpedoCountText.Text = $"{_periscopeTorpedoes} TORPEDOES";
+        PeriscopeIntroScreen.IsVisible = true;
+    }
+
+    private void OnPeriscopeClick(object? sender, RoutedEventArgs e)
+    {
+        PeriscopeIntroScreen.IsVisible = false;
+        Game.StartPeriscope(_periscopeTorpedoes);
     }
 
     private void OnGameOver(int score)
