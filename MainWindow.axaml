@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:SeaHunter"
         x:Class="SeaHunter.MainWindow"
-        Title="Sea Hunter"
+        Title="SeaHunter: Periscope Up"
         Width="1280" Height="720"
         WindowStartupLocation="CenterScreen"
         Background="Black"
@@ -65,6 +65,7 @@
                     <!-- Left: title, story, controls, ships -->
                     <StackPanel Margin="30,24,10,10" Spacing="2">
                         <TextBlock Classes="title" Text="SEA HUNTER"/>
+                        <TextBlock Classes="heading" Text="PERISCOPE UP" FontSize="14" Foreground="#FFD34D" Margin="0,0,0,2"/>
                         <TextBlock Classes="body" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Text="You command a submarine. Sink as many ships as you can before their depth charges sink you."/>
 

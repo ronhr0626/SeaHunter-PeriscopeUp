@@ -13,7 +13,7 @@ public static class HighScoreStore
 
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "SeaHunter",
+        "SeaHunter-PeriscopeUp",
         "highscores.json");
 
     public static List<int> Load()
