@@ -49,6 +49,7 @@ public class GameCanvas : Control
 
     private GameWorld _world = new(); // Replaced every time a new game starts
     private PeriscopeWorld? _periscope; // Set when the periscope round starts
+    private MinefieldWorld? _minefield; // Set when the minefield stage starts
     private readonly InputState _input = new();
     private readonly Bitmap _background;
     private readonly Bitmap _subSprite;
@@ -60,6 +61,11 @@ public class GameCanvas : Control
     private readonly Bitmap _destroyerSprite;
     private readonly Bitmap _splashSprite;
     private readonly Bitmap _warningGlow;
+    private readonly Bitmap _mineBackground;
+    private readonly Bitmap _damagedSub;
+    private readonly Bitmap _harbor;
+    private readonly Bitmap _mineSprite;
+    private readonly Bitmap _mineBlastSprite;
     private double _radarSweep; // Degrees, just for the look
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _clock = new();
@@ -70,6 +76,15 @@ public class GameCanvas : Control
 
     // True while the periscope round is shown
     public bool InPeriscope { get; private set; }
+
+    // True while the minefield (limping home) stage is shown
+    public bool InMinefield { get; private set; }
+
+    // Destroyers sunk in the last periscope round (gives sonar pings in the minefield)
+    public int DestroyersSunk => _periscope?.DestroyersSunk ?? 0;
+
+    // Raised once when the minefield ends: (final score, true = made it home)
+    public event Action<int, bool>? MinefieldOver;
 
     // Raised once when the side view game ends: (score, level reached)
     public event Action<int, int>? SideViewOver;
@@ -89,6 +104,11 @@ public class GameCanvas : Control
         _destroyerSprite = LoadImage("destroyer.png");
         _splashSprite = LoadImage("splash.png");
         _warningGlow = LoadImage("warning_glow.png");
+        _mineBackground = LoadImage("backgroundMine.png");
+        _damagedSub = LoadImage("damageSub.png");
+        _harbor = LoadImage("harbor.png");
+        _mineSprite = LoadImage("mine.png");
+        _mineBlastSprite = LoadImage("Minexploding.png");
 
         // Keep pixel art sharp when scaled up
         RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
@@ -105,7 +125,9 @@ public class GameCanvas : Control
     {
         _world = new GameWorld();
         _periscope = null;
+        _minefield = null;
         InPeriscope = false;
+        InMinefield = false;
         IsRunning = true;
     }
 
@@ -114,6 +136,16 @@ public class GameCanvas : Control
     {
         _periscope = new PeriscopeWorld(torpedoes, _world.Score);
         InPeriscope = true;
+        IsRunning = true;
+    }
+
+    // Starts the minefield stage with the score and destroyers from the periscope round
+    public void StartMinefield()
+    {
+        int score = _periscope?.Score ?? _world.Score;
+        _minefield = new MinefieldWorld(DestroyersSunk, score);
+        InPeriscope = false;
+        InMinefield = true;
         IsRunning = true;
     }
 
@@ -160,7 +192,18 @@ public class GameCanvas : Control
         _radarSweep = (_radarSweep + 120 * dt) % 360;
         _blink += dt;
 
-        if (InPeriscope && _periscope != null)
+        if (InMinefield && _minefield != null)
+        {
+            if (IsRunning)
+                _minefield.Update(dt, _input);
+
+            if (IsRunning && _minefield.IsOver)
+            {
+                IsRunning = false;
+                MinefieldOver?.Invoke(_minefield.Score, _minefield.IsHome);
+            }
+        }
+        else if (InPeriscope && _periscope != null)
         {
             if (IsRunning)
                 _periscope.Update(dt, _input);
@@ -208,6 +251,12 @@ public class GameCanvas : Control
         // Clip: anything outside the game world (like ships entering) is hidden in the black bars
         using (context.PushClip(new Rect(0, 0, GameWorld.Width, GameWorld.Height)))
         {
+            if (InMinefield && _minefield != null)
+            {
+                RenderMinefield(context, _minefield);
+                return;
+            }
+
             if (InPeriscope && _periscope != null)
             {
                 RenderPeriscope(context, _periscope);
@@ -424,7 +473,9 @@ public class GameCanvas : Control
         if (s.IsHunter)
         {
             // Destroyer seen from the front, getting bigger as it closes in
-            const double hunterScale = 2.0;      // Drawn twice as big
+            // Twice as big far away, and grows extra fast the last stretch so it fills the view when it hits
+            double closeness = 1 - s.Range / PeriscopeWorld.HunterStartRange;   // 0 far, 1 on top of us
+            double hunterScale = 2.0 + 3.0 * Math.Pow(closeness, 3);
             const double hunterMaxY = 235;       // Water line never lower than this on screen
 
             double w = width * hunterScale;
@@ -637,6 +688,195 @@ public class GameCanvas : Control
 
     private static void DrawSmallGreen(DrawingContext context, string text, double x, double y) =>
         context.DrawText(MakeText(text, 6.5, RadarTextBrush), new Point(x, y));
+
+    // ===================== MINEFIELD =====================
+
+    private static readonly IBrush FogBrush = new SolidColorBrush(Color.Parse("#B0061A2E"));
+    private static readonly IBrush RevealedBrush = new SolidColorBrush(Color.Parse("#2060C0FF"));
+    private static readonly IPen GridPen = new Pen(new SolidColorBrush(Color.Parse("#3080C8FF")), 0.6);
+    private static readonly IPen FlagPen = new Pen(new SolidColorBrush(Color.Parse("#FF4040")), 1.2);
+    private static readonly IBrush HudStripBrush = new SolidColorBrush(Color.Parse("#A0001020"));
+    private static readonly IBrush HullFullBrush = new SolidColorBrush(Color.Parse("#E24B4A"));
+    private static readonly IBrush[] NumberBrushes =
+    {
+        Brushes.Transparent,
+        new SolidColorBrush(Color.Parse("#85B7EB")),  // 1
+        new SolidColorBrush(Color.Parse("#97C459")),  // 2
+        new SolidColorBrush(Color.Parse("#EF9F27")),  // 3
+        new SolidColorBrush(Color.Parse("#E24B4A")),  // 4
+        new SolidColorBrush(Color.Parse("#D4537E")),  // 5+
+    };
+
+    private const double HarborWaterline = 0.47; // Where the water surface is in harbor.png (0 = top)
+
+    private void RenderMinefield(DrawingContext context, MinefieldWorld m)
+    {
+        const double cell = MinefieldWorld.CellSize;
+        double cameraX = (m.VisualCol - MinefieldWorld.SubScreenCol) * cell;
+
+        DrawMineBackground(context, cameraX);
+        DrawHarbor(context, cameraX);
+        DrawMineGrid(context, m, cameraX);
+        DrawSonarPing(context, m, cameraX);
+        DrawMineSub(context, m, cameraX);
+        DrawMineBlasts(context, m, cameraX);
+        DrawMineHud(context, m);
+    }
+
+    // Seamless background, scrolls at half speed for a bit of depth
+    private void DrawMineBackground(DrawingContext context, double cameraX)
+    {
+        double h = GameWorld.Height;
+        double w = h * _mineBackground.Size.Width / _mineBackground.Size.Height;
+        double x = -((cameraX * 0.5) % w);
+        if (x > 0) x -= w;
+        x = Math.Floor(x);
+
+        while (x < GameWorld.Width)
+        {
+            context.DrawImage(_mineBackground, new Rect(x, 0, w + 1, h));
+            x += w;
+        }
+    }
+
+    // Harbor right after the last column. Its water line sits at the top of the grid.
+    private void DrawHarbor(DrawingContext context, double cameraX)
+    {
+        double underwater = GameWorld.Height - MinefieldWorld.GridTop;
+        double h = underwater / (1 - HarborWaterline);
+        double w = h * _harbor.Size.Width / _harbor.Size.Height;
+        double x = MinefieldWorld.Cols * MinefieldWorld.CellSize - cameraX;
+        double y = MinefieldWorld.GridTop - h * HarborWaterline;
+
+        if (x < GameWorld.Width)
+            context.DrawImage(_harbor, new Rect(x, y, w, h));
+    }
+
+    private void DrawMineGrid(DrawingContext context, MinefieldWorld m, double cameraX)
+    {
+        const double cell = MinefieldWorld.CellSize;
+        int first = Math.Max(0, (int)(cameraX / cell) - 1);
+        int last = Math.Min(MinefieldWorld.Cols - 1, first + (int)(GameWorld.Width / cell) + 2);
+
+        for (int c = first; c <= last; c++)
+        {
+            double x = c * cell - cameraX;
+            for (int r = 0; r < MinefieldWorld.Rows; r++)
+            {
+                var mc = m.Cells[c, r];
+                var rect = new Rect(x, MinefieldWorld.GridTop + r * cell, cell, cell);
+
+                if (mc.IsRevealed)
+                {
+                    context.FillRectangle(RevealedBrush, rect);
+                    if (mc.Number > 0)
+                    {
+                        var brush = NumberBrushes[Math.Min(mc.Number, 5)];
+                        var text = MakeText(mc.Number.ToString(), 18, brush);
+                        context.DrawText(text, new Point(rect.Center.X - text.Width / 2, rect.Center.Y - text.Height / 2));
+                    }
+                }
+                else if (!mc.IsExploded)
+                {
+                    context.FillRectangle(FogBrush, rect);
+                }
+
+                // Mines found by sonar, or flagged by the player (faint)
+                if ((mc.IsDetected && !mc.IsExploded) || mc.IsFlagged)
+                {
+                    double mh = cell * 0.9;
+                    double mw = mh * _mineSprite.Size.Width / _mineSprite.Size.Height;
+                    using (context.PushOpacity(mc.IsDetected ? 1.0 : 0.45))
+                        context.DrawImage(_mineSprite, new Rect(rect.Center.X - mw / 2, rect.Y + cell * 0.05, mw, mh));
+                }
+
+                if (mc.IsFlagged)
+                    context.DrawRectangle(null, FlagPen, rect.Deflate(2), 3, 3);
+
+                context.DrawRectangle(null, GridPen, rect);
+            }
+        }
+    }
+
+    // Green arc that sweeps forward from the bow
+    private void DrawSonarPing(DrawingContext context, MinefieldWorld m, double cameraX)
+    {
+        if (m.PingAnim <= 0) return;
+
+        const double cell = MinefieldWorld.CellSize;
+        double progress = 1 - m.PingAnim / MinefieldWorld.PingAnimTime;
+        double cx = (m.VisualCol + 1) * cell - cameraX;
+        double cy = MinefieldWorld.GridTop + (m.VisualRow + 0.5) * cell;
+        double radius = progress * MinefieldWorld.PingRange * cell;
+        byte alpha = (byte)(220 * (1 - progress));
+
+        var pen = new Pen(new SolidColorBrush(Color.FromArgb(alpha, 96, 255, 96)), 2);
+        var arc = new StreamGeometry();
+        using (var g = arc.Open())
+        {
+            g.BeginFigure(new Point(cx, cy - radius), false);
+            g.ArcTo(new Point(cx, cy + radius), new Size(radius, radius), 0, false, SweepDirection.Clockwise);
+            g.EndFigure(false);
+        }
+        context.DrawGeometry(null, pen, arc);
+    }
+
+    private void DrawMineSub(DrawingContext context, MinefieldWorld m, double cameraX)
+    {
+        const double cell = MinefieldWorld.CellSize;
+        double w = cell * 2.2;
+        double h = w * _damagedSub.Size.Height / _damagedSub.Size.Width;
+        double cx = (m.VisualCol + 0.5) * cell - cameraX;
+        double cy = MinefieldWorld.GridTop + (m.VisualRow + 0.5) * cell;
+
+        // Slight bobbing, the boat is barely holding together
+        cy += Math.Sin(_blink * 2.5) * 1.5;
+
+        if (m.IsSunk) return;
+        context.DrawImage(_damagedSub, new Rect(cx - w * 0.6, cy - h / 2, w, h));
+    }
+
+    private void DrawMineBlasts(DrawingContext context, MinefieldWorld m, double cameraX)
+    {
+        const double cell = MinefieldWorld.CellSize;
+        foreach (var b in m.Blasts)
+        {
+            double size = cell * (1 + b.Progress * 1.5);
+            double cx = (b.Col + 0.5) * cell - cameraX;
+            double cy = MinefieldWorld.GridTop + (b.Row + 0.5) * cell;
+            using (context.PushOpacity(1 - b.Progress * 0.8))
+                context.DrawImage(_mineBlastSprite, new Rect(cx - size / 2, cy - size / 2, size, size));
+        }
+    }
+
+    private void DrawMineHud(DrawingContext context, MinefieldWorld m)
+    {
+        context.FillRectangle(HudStripBrush, new Rect(0, 0, GameWorld.Width, MinefieldWorld.GridTop));
+
+        DrawText(context, "LIMPING HOME", 10, 12, 12);
+
+        // Hull pieces
+        DrawText(context, "HULL", 150, 12, 11);
+        for (int i = 0; i < MinefieldWorld.StartHull; i++)
+        {
+            var brush = i < m.Hull ? HullFullBrush : AmmoEmptyBrush;
+            context.DrawRectangle(brush, null, new Rect(185 + i * 16, 13, 12, 10), 2, 2);
+        }
+
+        DrawText(context, $"PINGS {m.Pings}", 250, 12, 11);
+        DrawText(context, $"HARBOR {Math.Max(0, MinefieldWorld.Cols - m.Col)}", 330, 12, 11);
+        DrawText(context, $"SCORE {m.Score:D6}", GameWorld.Width - 10, 12, 11, TextAlignment.Right);
+
+        // Countdown bar to the next automatic step
+        double progress = 1 - m.AdvanceTimer / MinefieldWorld.AdvanceInterval;
+        context.FillRectangle(AmmoEmptyBrush, new Rect(0, MinefieldWorld.GridTop - 3, GameWorld.Width, 3));
+        context.FillRectangle(AmmoFullBrush, new Rect(0, MinefieldWorld.GridTop - 3, GameWorld.Width * progress, 3));
+
+        if (m.IsHome)
+            DrawColoredText(context, "HOME SAFE!", GameWorld.Width / 2, 150, 28, AmmoFullBrush);
+        else if (m.IsSunk)
+            DrawColoredText(context, "SUNK!", GameWorld.Width / 2, 150, 28, WarningTextBrush);
+    }
 
     private static FormattedText MakeText(string text, double size, IBrush brush) =>
         new(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, HudFont, size, brush);

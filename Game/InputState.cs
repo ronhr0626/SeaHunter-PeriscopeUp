@@ -27,7 +27,10 @@ public class InputState
     public bool Up => _down.Contains(PhysicalKey.W) || _down.Contains(PhysicalKey.ArrowUp);
     public bool Down => _down.Contains(PhysicalKey.S) || _down.Contains(PhysicalKey.ArrowDown);
 
-    // One-shot turn presses (periscope steps)
+    // One-shot presses (minefield moves)
+    public bool UpPressed => _pressed.Contains(PhysicalKey.W) || _pressed.Contains(PhysicalKey.ArrowUp);
+    public bool DownPressed => _pressed.Contains(PhysicalKey.S) || _pressed.Contains(PhysicalKey.ArrowDown);
+    public bool FlagPressed => _pressed.Contains(PhysicalKey.F);
     public bool LeftPressed => _pressed.Contains(PhysicalKey.A) || _pressed.Contains(PhysicalKey.ArrowLeft);
     public bool RightPressed => _pressed.Contains(PhysicalKey.D) || _pressed.Contains(PhysicalKey.ArrowRight);
 

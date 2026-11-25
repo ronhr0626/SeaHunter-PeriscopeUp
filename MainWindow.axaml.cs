@@ -16,6 +16,7 @@ public partial class MainWindow : Window
         // The canvas tells us when each part of the game ends
         Game.SideViewOver += OnSideViewOver;
         Game.GameOver += OnCrashDive;
+        Game.MinefieldOver += OnMinefieldOver;
 
         StartHighScoreList.ItemsSource = HighScoreStore.Format(HighScoreStore.Load());
     }
@@ -59,14 +60,25 @@ public partial class MainWindow : Window
     private void OnCrashDive(int score)
     {
         _finalScore = score;
+
+        int sunk = Game.DestroyersSunk;
+        int pings = MinefieldWorld.BasePings + sunk * MinefieldWorld.PingsPerDestroyer;
+        PingInfoText.Text = $"Destroyers sunk: {sunk}  →  {pings} sonar pings";
+
         CrashDiveScreen.IsVisible = true;
     }
 
-    // Later this will start the "limping home" stage. For now it goes to game over.
+    // Starts stage 3: limping home through the minefield
     private void OnCrashDiveContinueClick(object? sender, RoutedEventArgs e)
     {
         CrashDiveScreen.IsVisible = false;
-        ShowGameOver(_finalScore);
+        Game.StartMinefield();
+    }
+
+    private void OnMinefieldOver(int score, bool madeItHome)
+    {
+        GameOverTitle.Text = madeItHome ? "HOME SAFE!" : "GAME OVER";
+        ShowGameOver(score);
     }
 
     private void ShowGameOver(int score)

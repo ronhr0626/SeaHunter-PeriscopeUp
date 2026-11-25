@@ -75,6 +75,7 @@ public class PeriscopeWorld
     public double Heading { get; private set; }  // Where the periscope points, 0-360
     public int TorpedoesInStock { get; private set; }
     public int Score { get; private set; }
+    public int DestroyersSunk { get; private set; }
 
     public List<PeriShip> Ships { get; } = new();
     public List<PeriTorpedo> Torpedoes { get; } = new();
@@ -321,6 +322,7 @@ public class PeriscopeWorld
             {
                 // Further away = harder = more points
                 Score += (int)(hit.Points * hit.Range / 1000);
+                if (hit.IsHunter) DestroyersSunk++;
                 Explosions.Add(new PeriExplosion { Bearing = hit.Bearing, Range = hit.Range });
                 Ships.Remove(hit);
                 Torpedoes.RemoveAt(i);
