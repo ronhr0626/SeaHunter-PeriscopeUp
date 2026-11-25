@@ -27,6 +27,13 @@ public class InputState
     public bool Up => _down.Contains(PhysicalKey.W) || _down.Contains(PhysicalKey.ArrowUp);
     public bool Down => _down.Contains(PhysicalKey.S) || _down.Contains(PhysicalKey.ArrowDown);
 
+    // One-shot turn presses (periscope steps)
+    public bool LeftPressed => _pressed.Contains(PhysicalKey.A) || _pressed.Contains(PhysicalKey.ArrowLeft);
+    public bool RightPressed => _pressed.Contains(PhysicalKey.D) || _pressed.Contains(PhysicalKey.ArrowRight);
+
+    // Periscope: hold to swing towards the closest destroyer
+    public bool Track => _down.Contains(PhysicalKey.T) || _down.Contains(PhysicalKey.Q);
+
     // One press = one shot, holding the key does not auto-fire
     public bool Fire => _pressed.Contains(PhysicalKey.Space);
     public bool Restart => _pressed.Contains(PhysicalKey.R);

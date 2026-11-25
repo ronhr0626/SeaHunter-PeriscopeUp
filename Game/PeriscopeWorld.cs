@@ -48,7 +48,12 @@ public class PeriscopeWorld
 {
     // ===== Tweak these =====
     public const double FieldOfView = 40;        // Degrees visible across the screen
-    public const double TurnSpeed = 45;          // Periscope turn speed, degrees per second
+    public const double TurnSpeed = 45;          // Periscope turn speed at first, degrees per second
+    public const double MaxTurnSpeed = 200;      // Top speed when the turn key is held
+    public const double TurnAcceleration = 150;  // Degrees per second gained each second while held
+    public const double TrackSpeed = 220;        // Auto-swing speed towards a destroyer (Q / T)
+    public const double ArcHalf = 90;            // Periscope covers 90 degrees left and right of bow (180 total)
+    public const double SpawnHalf = 80;          // Ships appear inside this, so they start in view range
     public const int TorpedoesPerLevel = 3;      // Torpedoes earned per level reached in the side view
     public const int MinTorpedoes = 3;           // Never fewer than this
     public const int TubeCount = 3;
@@ -61,8 +66,8 @@ public class PeriscopeWorld
     public const double ShipLifeArc = 120;       // Degrees a ship sails before it is gone
     public const double HunterInterval = 25;     // Seconds between each destroyer
     public const double HunterStartRange = 4800;
-    public const double HunterSpeed = 200;       // Meters per second towards us
-    public const double HunterKillRange = 600;   // Closer than this and we are sunk
+    public const double HunterSpeed = 130;       // Meters per second towards us
+    public const double HunterKillRange = 350;   // Closer than this and we are sunk
     public const int HunterPoints = 500;
     public const double SunkDelay = 2.0;         // Seconds of red flash before the round ends
     // =======================
@@ -101,6 +106,8 @@ public class PeriscopeWorld
 
     private readonly Random _rng = new();
     private double _spawnTimer;
+    private double _turnSpeed = TurnSpeed;
+
     private double _hunterTimer = HunterInterval / 2; // First destroyer comes a bit earlier
 
     public PeriscopeWorld(int torpedoes, int startScore)
@@ -135,9 +142,7 @@ public class PeriscopeWorld
             return;
         }
 
-        if (input.Left) Heading -= TurnSpeed * dt;
-        if (input.Right) Heading += TurnSpeed * dt;
-        Heading = Normalize(Heading);
+        UpdateTurning(dt, input);
 
         if (input.Fire)
             TryFire();
@@ -149,6 +154,37 @@ public class PeriscopeWorld
         foreach (var e in Explosions) e.Age += dt;
         Explosions.RemoveAll(e => e.IsDone);
     }
+
+    private void UpdateTurning(double dt, InputState input)
+    {
+        // Q / T: swing the shortest way to the closest destroyer and stop on it
+        var hunter = ClosestHunter();
+        if (input.Track && hunter != null)
+        {
+            double diff = Delta(hunter.Bearing, Heading);
+            double step = TrackSpeed * dt;
+            Heading = ClampToArc(Heading + Math.Clamp(diff, -step, step));
+            return;
+        }
+
+        // A / D: starts slow for fine aiming, speeds up the longer the key is held
+        int dir = (input.Right ? 1 : 0) - (input.Left ? 1 : 0);
+        if (dir == 0)
+        {
+            _turnSpeed = TurnSpeed;
+            return;
+        }
+
+        _turnSpeed = Math.Min(MaxTurnSpeed, _turnSpeed + TurnAcceleration * dt);
+        Heading = ClampToArc(Heading + dir * _turnSpeed * dt);
+    }
+
+    // Keeps a bearing inside the front half circle (bow +- ArcHalf)
+    public static double ClampToArc(double bearing) =>
+        Normalize(Math.Clamp(Delta(bearing, 0), -ArcHalf, ArcHalf));
+
+    // Random bearing inside the spawn arc
+    private double RandomFrontBearing() => Normalize((_rng.NextDouble() * 2 - 1) * SpawnHalf);
 
     private void TryFire()
     {
@@ -210,7 +246,9 @@ public class PeriscopeWorld
             return;
         }
 
-        Ships.RemoveAll(s => !s.IsHunter && s.Travelled > ShipLifeArc);
+        // Ships that sailed far enough, or out of the front half circle, are gone
+        Ships.RemoveAll(s => !s.IsHunter &&
+            (s.Travelled > ShipLifeArc || Math.Abs(Delta(s.Bearing, 0)) > ArcHalf + 5));
     }
 
     // Destroyer from a random direction, heading straight for us with a little sideways drift
@@ -220,7 +258,7 @@ public class PeriscopeWorld
         {
             Type = ShipType.PatrolBoat,
             IsHunter = true,
-            Bearing = _rng.NextDouble() * 360,
+            Bearing = RandomFrontBearing(),
             Range = HunterStartRange,
             ApproachSpeed = HunterSpeed,
             SpeedMs = 3 + _rng.NextDouble() * 3,
@@ -244,7 +282,7 @@ public class PeriscopeWorld
 
         double bearing = aheadOffset.HasValue
             ? Heading + aheadOffset.Value
-            : _rng.NextDouble() * 360;
+            : RandomFrontBearing();
 
         double range = MinShipRange + _rng.NextDouble() * (MaxShipRange - MinShipRange);
 
@@ -310,7 +348,6 @@ public class PeriscopeWorld
     public static double Normalize(double deg) => ((deg % 360) + 360) % 360;
 
     // Shortest signed difference a - b, in -180..180
-        // Shortest signed difference a - b, in -180..180
     public static double Delta(double a, double b)
     {
         double d = Normalize(a - b);

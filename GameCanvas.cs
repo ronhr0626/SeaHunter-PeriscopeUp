@@ -423,17 +423,15 @@ public class GameCanvas : Control
 
         if (s.IsHunter)
         {
-                     // Destroyer seen from the front, getting bigger as it closes in
-                       // Twice as big far away, and grows extra fast the last stretch so it fills the view when it hits
-            double closeness = 1 - s.Range / PeriscopeWorld.HunterStartRange;   // 0 far, 1 on top of us
-            double hunterScale = 2.0 + 3.0 * Math.Pow(closeness, 3);
+            // Destroyer seen from the front, getting bigger as it closes in
+            const double hunterScale = 2.0;      // Drawn twice as big
             const double hunterMaxY = 235;       // Water line never lower than this on screen
 
             double w = width * hunterScale;
             double h = w * _destroyerSprite.Size.Height / _destroyerSprite.Size.Width;
             double y = Math.Min(waterline, hunterMaxY) - h * 0.88;  // Bow wave sits on the water line
             using (context.PushOpacity(opacity))
-                context.DrawImage(_destroyerSprite, new Rect(cx - w / 2, y, w, h));  
+                context.DrawImage(_destroyerSprite, new Rect(cx - w / 2, y, w, h));
 
             // Red arrow above it, so it is easy to spot far away
             double a = 4;
@@ -509,16 +507,17 @@ public class GameCanvas : Control
         }
     }
 
-    // Heading-up radar. The half circle shows all 360 degrees squeezed into 180,
-    // so straight ahead is up and straight behind is at the far left/right edge.
+    // Radar for the front half circle: straight up is the bow, left/right edge is 90 degrees to each side.
+    // The green wedge shows where the periscope is pointing.
     private void DrawRadar(DrawingContext context, PeriscopeWorld p)
     {
         var center = new Point(RadarX, RadarY);
 
-        // Field of view wedge
-        double fovHalf = PeriscopeWorld.FieldOfView / 4; // Halved twice: half the FOV, squeezed 2:1
-        context.DrawLine(RadarFovPen, center, RadarPoint(-fovHalf, 1));
-        context.DrawLine(RadarFovPen, center, RadarPoint(fovHalf, 1));
+        // Periscope view wedge
+        double look = PeriscopeWorld.Delta(p.Heading, 0);
+        double fovHalf = PeriscopeWorld.FieldOfView / 2;
+        context.DrawLine(RadarFovPen, center, RadarPoint(look - fovHalf, 1));
+        context.DrawLine(RadarFovPen, center, RadarPoint(look + fovHalf, 1));
 
         // Sweep line going back and forth over the half circle
         double sweep = Math.Abs(_radarSweep - 180) - 90;
@@ -526,8 +525,9 @@ public class GameCanvas : Control
 
         foreach (var s in p.Ships)
         {
-            double angle = PeriscopeWorld.Delta(s.Bearing, p.Heading) / 2;
+            double angle = PeriscopeWorld.Delta(s.Bearing, 0);
             double dist = s.Range / PeriscopeWorld.TorpedoMaxRange;
+
             if (s.IsHunter)
             {
                 // Red dot that starts small in the outer ring and grows as it closes in
@@ -543,7 +543,7 @@ public class GameCanvas : Control
 
         foreach (var t in p.Torpedoes)
         {
-            double angle = PeriscopeWorld.Delta(t.Bearing, p.Heading) / 2;
+            double angle = PeriscopeWorld.Delta(t.Bearing, 0);
             double dist = Math.Min(1, t.Range / PeriscopeWorld.TorpedoMaxRange);
             context.DrawEllipse(Brushes.White, null, RadarPoint(angle, dist), 1, 1);
         }
@@ -560,7 +560,7 @@ public class GameCanvas : Control
     private void DrawPeriHud(DrawingContext context, PeriscopeWorld p)
     {
         // Heading just under the top notch, next to the vertical line
-        DrawText(context, $"{p.Heading:000}°", PeriCenterX + 4, 50, 9);
+        DrawText(context, $"{PeriscopeWorld.Delta(p.Heading, 0):+0;-0;0}°", PeriCenterX + 4, 50, 9);   // - = left of bow, + = right
 
         // Left lens: torpedoes in stock and the three tubes
         DrawText(context, $"TORPEDOES {p.TorpedoesInStock}", 105, 36, 9);
@@ -597,7 +597,7 @@ public class GameCanvas : Control
             double rate = Math.Clamp(hunter.Range / 1000, 0.15, 0.6);
             if ((int)(_blink / rate) % 2 == 0)
             {
-                DrawColoredText(context, $"DESTROYER {hunter.Range / 1000:0.0}km  {hunter.Bearing:000}°",
+                DrawColoredText(context, $"DESTROYER {hunter.Range / 1000:0.0}km  {PeriscopeWorld.Delta(hunter.Bearing, 0):+0;-0;0}°",
                     PeriCenterX, 262, 10, WarningTextBrush);
 
                 // Light up the red lamp top left
@@ -611,7 +611,7 @@ public class GameCanvas : Control
             byte alpha = (byte)(140 * p.SunkTimeLeft / PeriscopeWorld.SunkDelay + 40);
             context.FillRectangle(new SolidColorBrush(Color.FromArgb(alpha, 200, 0, 0)),
                 new Rect(0, 0, GameWorld.Width, GameWorld.Height));
-            DrawColoredText(context, "SUNK BY DESTROYER", PeriCenterX, 140, 24, Brushes.White);
+            DrawColoredText(context, "CRASH DIVE!", PeriCenterX, 140, 28, Brushes.White);
         }
 
         // Target data on the small plate bottom right

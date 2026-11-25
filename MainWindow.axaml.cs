@@ -7,6 +7,7 @@ namespace SeaHunter;
 public partial class MainWindow : Window
 {
     private int _periscopeTorpedoes;
+    private int _finalScore;
 
     public MainWindow()
     {
@@ -14,7 +15,7 @@ public partial class MainWindow : Window
 
         // The canvas tells us when each part of the game ends
         Game.SideViewOver += OnSideViewOver;
-        Game.GameOver += OnGameOver;
+        Game.GameOver += OnCrashDive;
 
         StartHighScoreList.ItemsSource = HighScoreStore.Format(HighScoreStore.Load());
     }
@@ -34,6 +35,7 @@ public partial class MainWindow : Window
         StartScreen.IsVisible = false;
         GameOverScreen.IsVisible = false;
         PeriscopeIntroScreen.IsVisible = false;
+        CrashDiveScreen.IsVisible = false;
         Game.StartNewGame();
     }
 
@@ -53,7 +55,21 @@ public partial class MainWindow : Window
         Game.StartPeriscope(_periscopeTorpedoes);
     }
 
-    private void OnGameOver(int score)
+    // The destroyer got us in the periscope: show the crash dive message first
+    private void OnCrashDive(int score)
+    {
+        _finalScore = score;
+        CrashDiveScreen.IsVisible = true;
+    }
+
+    // Later this will start the "limping home" stage. For now it goes to game over.
+    private void OnCrashDiveContinueClick(object? sender, RoutedEventArgs e)
+    {
+        CrashDiveScreen.IsVisible = false;
+        ShowGameOver(_finalScore);
+    }
+
+    private void ShowGameOver(int score)
     {
         // Only save real scores
         var top = score > 0 ? HighScoreStore.Add(score) : HighScoreStore.Load();
