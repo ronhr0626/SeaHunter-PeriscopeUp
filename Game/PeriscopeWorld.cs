@@ -143,8 +143,13 @@ public class PeriscopeWorld
         return true;
     }
 
+    // Seconds since the periscope round started (used for help text)
+    public double Elapsed { get; private set; }
+
     public void Update(double dt, InputState input)
     {
+        Elapsed += dt;
+
         if (IsSunk)
         {
             // Frozen: only the explosion and red flash play out

@@ -60,7 +60,7 @@
         <Border x:Name="StartScreen" Background="#CC00101C">
             <!-- Designed at 640x360 and scaled like the game -->
             <Viewbox Stretch="Uniform">
-                <Grid Width="640" Height="360" ColumnDefinitions="*,170" Margin="0">
+                <Grid Width="640" Height="360" ColumnDefinitions="*,130" Margin="0">
 
                     <!-- Left: title, story, controls, ships -->
                     <StackPanel Margin="30,24,10,10" Spacing="2">
@@ -70,13 +70,15 @@
                                    Text="You command a submarine. Sink as many ships as you can before their depth charges sink you."/>
 
                         <TextBlock Classes="heading" Text="CONTROLS"/>
-                        <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto">
+                        <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto">
                             <TextBlock Grid.Row="0" Classes="key" Text="A D / ← →"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Classes="body" Text="Move left and right"/>
                             <TextBlock Grid.Row="1" Classes="key" Text="W S / ↑ ↓"/>
                             <TextBlock Grid.Row="1" Grid.Column="1" Classes="body" Text="Dive and rise"/>
                             <TextBlock Grid.Row="2" Classes="key" Text="SPACE"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Classes="body" Text="Fire torpedo (5, then reload)"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Classes="body" Text="Fire torpedo (5+, then reload)"/>
+                            <TextBlock Grid.Row="3" Classes="key" Text="Q"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Classes="body" Text="Bubble shield  /  periscope: swing to destroyer"/>
                         </Grid>
 
                         <TextBlock Classes="heading" Text="TARGETS"/>
@@ -92,10 +94,8 @@
                             <TextBlock Grid.Row="2" Grid.Column="2" Classes="body" Text="Close, takes 2 hits, drops charges"/>
                         </Grid>
 
-                        <TextBlock Classes="body" Margin="0,8,0,0"
-                                   Text="3 lives. Every 1000 points: new level, more ships, more bombs. Make it home through the minefield to earn 3 bubble shields (Q)."/>
-                        <TextBlock Classes="body" TextWrapping="Wrap"
-                                   Text="When you are damaged: periscope up! 3 torpedoes per level played. A D / ← → turns, SPACE fires. Aim ahead of the ship."/>
+                        <TextBlock Classes="body" Margin="0,8,0,0" TextWrapping="Wrap"
+                                   Text="3 lives. Every 1000 points = new level. When damaged: periscope up (3 torpedoes per level played), then limp home through the minefield. Make it home to earn 3 bubble shields (Q)."/>
 
                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
                             <Button Content="START" Click="OnStartClick" IsDefault="True"/>
@@ -119,7 +119,7 @@
                     </StackPanel>
 
                     <!-- Right: high scores -->
-                    <StackPanel Grid.Column="1" Margin="0,30,20,10" Spacing="1">
+                    <StackPanel Grid.Column="1" Margin="0,30,12,10" Spacing="1">
                         <TextBlock Classes="heading" Text="HIGH SCORES"/>
                         <ItemsControl x:Name="StartHighScoreList">
                             <ItemsControl.ItemTemplate>

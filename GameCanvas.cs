@@ -734,6 +734,17 @@ public class GameCanvas : Control
             }
         }
 
+        // Controls help for the first seconds of the round
+        const double helpTime = 8;
+        if (p.Elapsed < helpTime && !p.IsSunk)
+        {
+            using (context.PushOpacity(Math.Min(1, (helpTime - p.Elapsed) / 1.5)))
+            {
+                DrawColoredText(context, "A D / ← →  TURN  (HOLD = FASTER)", PeriCenterX, 222, 9, Brushes.White);
+                DrawColoredText(context, "Q  SWING TO DESTROYER     SPACE  FIRE", PeriCenterX, 234, 9, Brushes.White);
+            }
+        }
+
         if (p.IsOutOfTorpedoes && !p.IsSunk)
             DrawColoredText(context, "OUT OF TORPEDOES", PeriCenterX, 70, 12, WarningTextBrush);
 
@@ -755,7 +766,7 @@ public class GameCanvas : Control
             double rate = Math.Clamp(hunter.Range / 1000, 0.15, 0.6);
             if ((int)(_blink / rate) % 2 == 0)
             {
-                DrawColoredText(context, $"DESTROYER {hunter.Range / 1000:0.0}km  {PeriscopeWorld.Delta(hunter.Bearing, 0):+0;-0;0}°",
+                DrawColoredText(context, $"DESTROYER {hunter.Range / 1000:0.0}km  {PeriscopeWorld.Delta(hunter.Bearing, 0):+0;-0;0}°   [Q] TO AIM",
                     PeriCenterX, 262, 10, WarningTextBrush);
 
                 // Light up the red lamp top left
