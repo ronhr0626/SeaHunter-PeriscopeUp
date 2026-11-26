@@ -212,7 +212,7 @@
                             <TextBlock Classes="heading" Text="YOU MADE THE LIST! ENTER YOUR NAME" HorizontalAlignment="Center"/>
                             <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
                                 <TextBox x:Name="NameBox" Width="150" MaxLength="12" FontSize="12"
-                                         Watermark="MAX 12 LETTERS"/>
+                                                                                 PlaceholderText="MAX 12 LETTERS"/>
                                 <Button x:Name="SaveNameButton" Content="SAVE" Click="OnSaveNameClick" IsDefault="True"/>
                             </StackPanel>
                         </StackPanel>
