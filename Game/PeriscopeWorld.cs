@@ -36,7 +36,7 @@ public class PeriTorpedo
 
 public class PeriExplosion
 {
-    public const double Duration = 1.2;
+    public const double Duration = 1.9;   // Up 0.35 s, hold 0.4 s, down 1.15 s
     public double Bearing { get; init; }
     public double Range { get; init; }
     public double Age { get; set; }
@@ -71,7 +71,10 @@ public class PeriscopeWorld
     public const double HunterSpeed = 130;       // Meters per second towards us
     public const double HunterKillRange = 350;   // Closer than this and we are sunk
     public const int HunterPoints = 500;
-    public const double SunkDelay = 2.0;         // Seconds of red flash before the round ends
+    public const double SunkDelay = 2.0;
+    public const int MaxHuntersPerWave = 4;      // Patrol 1 = 1 destroyer, patrol 2 = 2 at once, patrol 3 = 3 ...
+    public const double HunterSpeedPerPatrol = 0.15;  // +15% destroyer speed for each new patrol
+    public const double WaveRangeGap = 500;      // Meters between destroyers in the same wave         // Seconds of red flash before the round ends
     // =======================
 
     public double Heading { get; private set; }  // Where the periscope points, 0-360
@@ -113,8 +116,14 @@ public class PeriscopeWorld
 
     private double _hunterTimer = HunterInterval / 2; // First destroyer comes a bit earlier
 
-    public PeriscopeWorld(int torpedoes, int startScore)
+    // Harder every patrol: more destroyers at once, and faster
+    public int Patrol { get; }
+    public int HuntersPerWave => Math.Min(MaxHuntersPerWave, Patrol);
+    public double CurrentHunterSpeed => HunterSpeed * (1 + (Patrol - 1) * HunterSpeedPerPatrol);
+
+    public PeriscopeWorld(int torpedoes, int startScore, int patrol = 1)
     {
+        Patrol = Math.Max(1, patrol);
         TorpedoesInStock = Math.Max(MinTorpedoes, torpedoes);
         Score = startScore;
 
@@ -224,7 +233,7 @@ public class PeriscopeWorld
         _hunterTimer -= dt;
         if (_hunterTimer <= 0)
         {
-            SpawnHunter();
+            SpawnHunterWave();
             _hunterTimer = HunterInterval * (0.8 + _rng.NextDouble() * 0.4);
         }
 
@@ -254,16 +263,23 @@ public class PeriscopeWorld
             (s.Travelled > ShipLifeArc || Math.Abs(Delta(s.Bearing, 0)) > ArcHalf + 5));
     }
 
+    // A wave of destroyers: spread out sideways, and a bit apart in range so they arrive one after another
+    private void SpawnHunterWave()
+    {
+        for (int i = 0; i < HuntersPerWave; i++)
+            SpawnHunter(HunterStartRange + i * WaveRangeGap);
+    }
+
     // Destroyer from a random direction, heading straight for us with a little sideways drift
-    private void SpawnHunter()
+    private void SpawnHunter(double range)
     {
         Ships.Add(new PeriShip
         {
             Type = ShipType.PatrolBoat,
             IsHunter = true,
             Bearing = RandomFrontBearing(),
-            Range = HunterStartRange,
-            ApproachSpeed = HunterSpeed,
+            Range = range,
+            ApproachSpeed = CurrentHunterSpeed,
             SpeedMs = 3 + _rng.NextDouble() * 3,
             MovingRight = _rng.Next(2) == 0,
             LengthM = 40,          // Seen from the front: only the beam and bow wave are visible

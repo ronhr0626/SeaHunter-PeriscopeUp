@@ -123,6 +123,7 @@ public class GameCanvas : Control
 
     public void StartNewGame()
     {
+        Patrol = 1;
         _world = new GameWorld();
         _periscope = null;
         _minefield = null;
@@ -134,16 +135,60 @@ public class GameCanvas : Control
     // Starts the periscope round with the score from the side view game
     public void StartPeriscope(int torpedoes)
     {
-        _periscope = new PeriscopeWorld(torpedoes, _world.Score);
+        _periscope = new PeriscopeWorld(torpedoes, _world.Score, Patrol);
         InPeriscope = true;
         IsRunning = true;
+    }
+
+    // Patrol 1 starts on level 1, patrol 2 on level 5, then 10, 15 ...
+    public const int PatrolLevelStep = 5;
+    public int Patrol { get; private set; } = 1;
+    public int NextPatrolLevel => Patrol * PatrolLevelStep;
+
+    // Levels played in the side view this patrol (only these give torpedoes)
+    public int LevelsPlayed => _world.LevelsPlayed;
+
+    // Made it home: new patrol in the side view with the score kept and bubble shields as reward
+    public void StartNextPatrol()
+    {
+        int score = _minefield?.Score ?? _world.Score;
+        int startLevel = NextPatrolLevel;
+        Patrol++;
+        _world = new GameWorld(score, GameWorld.RewardShields, startLevel, Patrol);
+        _periscope = null;
+        _minefield = null;
+        InPeriscope = false;
+        InMinefield = false;
+        IsRunning = true;
+    }
+
+    // Test mode: jump straight to a patrol and a stage (1 = side view, 2 = periscope, 3 = minefield)
+    public void StartTest(int patrol, int stage)
+    {
+        Patrol = patrol;
+        int startLevel = patrol == 1 ? 1 : (patrol - 1) * PatrolLevelStep;
+        int shields = patrol == 1 ? 0 : GameWorld.RewardShields;
+        _world = new GameWorld(0, shields, startLevel, patrol);
+        _periscope = null;
+        _minefield = null;
+        InPeriscope = false;
+        InMinefield = false;
+        IsRunning = true;
+
+        if (stage == 2)
+            StartPeriscope(3 * PeriscopeWorld.TorpedoesPerLevel);   // As if 3 levels were played
+        else if (stage == 3)
+        {
+            _minefield = new MinefieldWorld(2, 0, patrol);         // As if 2 destroyers were sunk
+            InMinefield = true;
+        }
     }
 
     // Starts the minefield stage with the score and destroyers from the periscope round
     public void StartMinefield()
     {
         int score = _periscope?.Score ?? _world.Score;
-        _minefield = new MinefieldWorld(DestroyersSunk, score);
+        _minefield = new MinefieldWorld(DestroyersSunk, score, Patrol);
         InPeriscope = false;
         InMinefield = true;
         IsRunning = true;
@@ -327,6 +372,30 @@ public class GameCanvas : Control
 
         var sub = _world.Player;
         DrawSprite(context, _subSprite, sub.X, sub.Y, sub.Width, sub.Height, sub.FacingRight);
+
+        if (_world.IsShielded)
+            DrawBubbleShield(context, sub);
+    }
+
+    private static readonly IBrush ShieldFillBrush = new SolidColorBrush(Color.Parse("#3060C8FF"));
+    private static readonly IPen ShieldPen = new Pen(new SolidColorBrush(Color.Parse("#C0A8E4FF")), 1.5);
+    private static readonly IBrush ShieldShineBrush = new SolidColorBrush(Color.Parse("#90FFFFFF"));
+
+    // Blue see-through bubble around the sub. Blinks the last 1.5 seconds.
+    private void DrawBubbleShield(DrawingContext context, Submarine sub)
+    {
+        if (_world.ShieldTimeLeft < 1.5 && (int)(_world.ShieldTimeLeft * 8) % 2 == 0)
+            return;
+
+        var center = new Point(sub.X + sub.Width / 2, sub.Y + sub.Height / 2);
+        double wobble = Math.Sin(_blink * 6) * 1.2;
+        double rx = sub.Width * 0.65 + wobble;
+        double ry = sub.Height * 1.1 - wobble;
+
+        context.DrawEllipse(ShieldFillBrush, ShieldPen, center, rx, ry);
+
+        // Small shine top left, so it reads as a bubble
+        context.DrawEllipse(ShieldShineBrush, null, new Point(center.X - rx * 0.45, center.Y - ry * 0.5), rx * 0.15, ry * 0.12);
     }
 
     // Small dark barrels with a yellow band
@@ -384,6 +453,20 @@ public class GameCanvas : Control
         DrawText(context, $"LEVEL {_world.Level}", 10, 26, 12);
         DrawText(context, $"LIVES {_world.Lives}", GameWorld.Width - 10, 8, 14, TextAlignment.Right);
 
+        // Bubble shields left (Q), only after they have been earned
+        if (_world.ShieldsLeft > 0 || _world.IsShielded)
+        {
+            DrawText(context, "SHIELD Q", GameWorld.Width - 10, 26, 10, TextAlignment.Right);
+            for (int i = 0; i < GameWorld.RewardShields; i++)
+            {
+                var center = new Point(GameWorld.Width - 72 - i * 13, 32);
+                if (i < _world.ShieldsLeft)
+                    context.DrawEllipse(ShieldFillBrush, ShieldPen, center, 5, 5);
+                else
+                    context.DrawEllipse(null, new Pen(AmmoEmptyBrush, 1), center, 5, 5);
+            }
+        }
+
         // Big banner in the middle for a moment after leveling up
         if (_world.LevelUpTimeLeft > 0)
             DrawText(context, $"LEVEL {_world.Level}", GameWorld.Width / 2, 150, 28, TextAlignment.Center);
@@ -396,7 +479,7 @@ public class GameCanvas : Control
         const double slotHeight = 14;
         const double gap = 4;
 
-        double totalWidth = GameWorld.MaxTorpedoes * slotWidth + (GameWorld.MaxTorpedoes - 1) * gap;
+        double totalWidth = _world.MaxTorpedoes * slotWidth + (_world.MaxTorpedoes - 1) * gap;
         double startX = GameWorld.Width / 2 - totalWidth / 2;
         const double y = 8;
 
@@ -404,7 +487,7 @@ public class GameCanvas : Control
         context.DrawRectangle(HudBackBrush, null,
             new Rect(startX - 6, y - 4, totalWidth + 12, slotHeight + 14), 4, 4);
 
-        for (int i = 0; i < GameWorld.MaxTorpedoes; i++)
+        for (int i = 0; i < _world.MaxTorpedoes; i++)
         {
             var brush = i < _world.Ammo ? AmmoFullBrush : AmmoEmptyBrush;
             context.DrawRectangle(brush, null,
@@ -474,7 +557,7 @@ public class GameCanvas : Control
         {
             // Destroyer seen from the front, getting bigger as it closes in
             // Twice as big far away, and grows extra fast the last stretch so it fills the view when it hits
-            double closeness = 1 - s.Range / PeriscopeWorld.HunterStartRange;   // 0 far, 1 on top of us
+            double closeness = Math.Max(0, 1 - s.Range / PeriscopeWorld.HunterStartRange);   // 0 far, 1 on top of us
             double hunterScale = 2.0 + 3.0 * Math.Pow(closeness, 3);
             const double hunterMaxY = 235;       // Water line never lower than this on screen
 
@@ -539,24 +622,42 @@ public class GameCanvas : Control
     }
 
     // Water column from splash.png: shoots up fast, then fades out
+    // Water column: shoots up out of the sea, hangs at the top for a moment, then sinks back down.
+    // It is clipped at the water line, so it really looks like it rises from and falls into the water.
     private void DrawPeriExplosions(DrawingContext context, PeriscopeWorld p)
     {
+        const double riseTime = 0.35;
+        const double holdTime = 0.4;
+        const double fallTime = PeriExplosion.Duration - riseTime - holdTime;
+
         foreach (var e in p.Explosions)
         {
             double x = BearingToX(p, e.Bearing);
             double waterline = RangeToY(e.Range);
 
-            double fullHeight = 60000 / e.Range;                     // Closer = bigger
-            double rise = Math.Min(1, e.Progress / 0.3);              // Up in the first 30%
-            double fade = e.Progress < 0.5 ? 1 : 1 - (e.Progress - 0.5) / 0.5;
+            double h = 60000 / e.Range;                               // Closer = bigger
+            double w = h * _splashSprite.Size.Width / _splashSprite.Size.Height;
 
-            double h = fullHeight * (0.4 + 0.6 * rise);
-            double w = fullHeight * _splashSprite.Size.Width / _splashSprite.Size.Height;
+            // How far the column is pushed down below the water: 1 = hidden, 0 = fully up
+            double sunk;
+            if (e.Age < riseTime)
+                sunk = 1 - EaseOut(e.Age / riseTime);
+            else if (e.Age < riseTime + holdTime)
+                sunk = 0;
+            else
+                sunk = EaseIn((e.Age - riseTime - holdTime) / fallTime);
 
-            using (context.PushOpacity(fade))
-                context.DrawImage(_splashSprite, new Rect(x - w / 2, waterline - h * 0.92, w, h));
+            double top = waterline - h * 0.92 + sunk * h;
+            double fade = sunk > 0.7 && e.Age > riseTime ? 1 - (sunk - 0.7) / 0.3 : 1;
+
+            using (context.PushClip(new Rect(0, 0, GameWorld.Width, waterline + h * 0.08)))
+            using (context.PushOpacity(Math.Clamp(fade, 0, 1)))
+                context.DrawImage(_splashSprite, new Rect(x - w / 2, top, w, h));
         }
     }
+
+    private static double EaseOut(double t) => 1 - (1 - t) * (1 - t);
+    private static double EaseIn(double t) => t * t;
 
     // Radar for the front half circle: straight up is the bow, left/right edge is 90 degrees to each side.
     // The green wedge shows where the periscope is pointing.
@@ -582,9 +683,9 @@ public class GameCanvas : Control
             if (s.IsHunter)
             {
                 // Red dot that starts small in the outer ring and grows as it closes in
-                double closeness = 1 - s.Range / PeriscopeWorld.HunterStartRange;   // 0 far, 1 on top of us
+                double closeness = Math.Max(0, 1 - s.Range / PeriscopeWorld.HunterStartRange);   // 0 far, 1 on top of us
                 double size = 2 + closeness * 5;
-                context.DrawEllipse(HunterBrush, null, RadarPoint(angle, dist), size, size);
+                context.DrawEllipse(HunterBrush, null, RadarPoint(angle, Math.Min(1, dist)), size, size);
             }
             else
             {
@@ -614,7 +715,7 @@ public class GameCanvas : Control
         DrawText(context, $"{PeriscopeWorld.Delta(p.Heading, 0):+0;-0;0}°", PeriCenterX + 4, 50, 9);   // - = left of bow, + = right
 
         // Left lens: torpedoes in stock and the three tubes
-               // Stock plus the ones already loaded (or loading) in the tubes
+        // Stock plus the ones already loaded (or loading) in the tubes
         int torpedoesLeft = p.TorpedoesInStock + Array.FindAll(p.Tubes, t => t >= 0).Length;
         DrawText(context, $"TORPEDOES {torpedoesLeft}", 105, 36, 9);
         for (int i = 0; i < PeriscopeWorld.TubeCount; i++)
@@ -637,7 +738,9 @@ public class GameCanvas : Control
             DrawColoredText(context, "OUT OF TORPEDOES", PeriCenterX, 70, 12, WarningTextBrush);
 
         // Right lens: score
-               // Destroyers sunk, and the sonar pings they give in the minefield
+        DrawText(context, $"SCORE {p.Score:D6}", 535, 36, 9, TextAlignment.Right);
+
+        // Destroyers sunk, and the sonar pings they give in the minefield
         DrawColoredText(context, $"DESTROYERS {p.DestroyersSunk}", 495, 50, 9, WarningTextBrush);
         DrawText(context, $"+{p.DestroyersSunk * MinefieldWorld.PingsPerDestroyer} PINGS", 535, 62, 8, TextAlignment.Right);
 
@@ -719,7 +822,7 @@ public class GameCanvas : Control
         double cameraX = (m.VisualCol - MinefieldWorld.SubScreenCol) * cell;
 
         DrawMineBackground(context, cameraX);
-        DrawHarbor(context, cameraX);
+        DrawHarbor(context, m, cameraX);
         DrawMineGrid(context, m, cameraX);
         DrawSonarPing(context, m, cameraX);
         DrawMineSub(context, m, cameraX);
@@ -744,12 +847,12 @@ public class GameCanvas : Control
     }
 
     // Harbor right after the last column. Its water line sits at the top of the grid.
-    private void DrawHarbor(DrawingContext context, double cameraX)
+    private void DrawHarbor(DrawingContext context, MinefieldWorld m, double cameraX)
     {
         double underwater = GameWorld.Height - MinefieldWorld.GridTop;
         double h = underwater / (1 - HarborWaterline);
         double w = h * _harbor.Size.Width / _harbor.Size.Height;
-        double x = MinefieldWorld.Cols * MinefieldWorld.CellSize - cameraX;
+        double x = m.Cols * MinefieldWorld.CellSize - cameraX;
         double y = MinefieldWorld.GridTop - h * HarborWaterline;
 
         if (x < GameWorld.Width)
@@ -760,7 +863,7 @@ public class GameCanvas : Control
     {
         const double cell = MinefieldWorld.CellSize;
         int first = Math.Max(0, (int)(cameraX / cell) - 1);
-        int last = Math.Min(MinefieldWorld.Cols - 1, first + (int)(GameWorld.Width / cell) + 2);
+        int last = Math.Min(m.Cols - 1, first + (int)(GameWorld.Width / cell) + 2);
 
         for (int c = first; c <= last; c++)
         {
@@ -868,7 +971,7 @@ public class GameCanvas : Control
         }
 
         DrawText(context, $"PINGS {m.Pings}", 250, 12, 11);
-        DrawText(context, $"HARBOR {Math.Max(0, MinefieldWorld.Cols - m.Col)}", 330, 12, 11);
+        DrawText(context, $"HARBOR {Math.Max(0, m.Cols - m.Col)}", 330, 12, 11);
         DrawText(context, $"SCORE {m.Score:D6}", GameWorld.Width - 10, 12, 11, TextAlignment.Right);
 
         // Countdown bar to the next automatic step

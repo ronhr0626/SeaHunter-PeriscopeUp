@@ -15,13 +15,18 @@ public class GameWorld
     public const double SeaFloor = 335;
 
     // Torpedo rules
-    public const int MaxTorpedoes = 5;
+    public const int BaseTorpedoes = 5;        // Magazine size on patrol 1
+    public const int MaxTorpedoCap = 12;       // Never more than this, however many patrols
     public const double ReloadTime = 2.5;    // Seconds to reload when empty
     public const double FireCooldown = 0.25; // Seconds between shots
 
     // Player rules
     public const int StartLives = 3;
     public const double InvulnerableTime = 2.0; // Seconds of safety after being hit
+
+    // Bubble shield (Q): stops depth charges for a while. Earned by making it home.
+    public const int RewardShields = 3;
+    public const double ShieldTime = 5.0;       // Seconds each shield lasts
 
     // ===== Level rules: tweak these =====
     public const int PointsPerLevel = 1000;        // Score needed for each new level
@@ -41,18 +46,31 @@ public class GameWorld
     public bool IsGameOver => Lives <= 0;
 
     // Level is calculated from score, so it can never get out of sync
-    public int Level => 1 + Score / PointsPerLevel;
+    // Later patrols start on a higher level. Level still rises every PointsPerLevel from there.
+    public int StartLevel { get; } = 1;
+    public int Level => StartLevel + (Score - _startScore) / PointsPerLevel;
+
+    // Levels actually played this patrol (gives periscope torpedoes)
+    public int LevelsPlayed => Level - StartLevel + 1;
+
+    private readonly int _startScore;
 
     // 1.0 at level 1, 1.2 at level 2, 1.4 at level 3 ... capped at MaxDifficulty
     public double Difficulty => Math.Min(MaxDifficulty, 1 + (Level - 1) * DifficultyPerLevel);
 
     public double LevelUpTimeLeft { get; private set; }
 
-    public int Ammo { get; private set; } = MaxTorpedoes;
+    // Magazine size: 5 on patrol 1, then +1 for every new patrol, up to 12
+    public int MaxTorpedoes { get; private set; } = BaseTorpedoes;
+    public int Ammo { get; private set; } = BaseTorpedoes;
     public bool IsReloading => Ammo == 0;
 
     // 0.0 = just started reloading, 1.0 = done
     public double ReloadProgress => IsReloading ? 1 - _reloadTimer / ReloadTime : 1;
+
+    public int ShieldsLeft { get; private set; }
+    public double ShieldTimeLeft { get; private set; }
+    public bool IsShielded => ShieldTimeLeft > 0;
 
     public double InvulnerableTimeLeft { get; private set; }
     public bool IsInvulnerable => InvulnerableTimeLeft > 0;
@@ -61,6 +79,20 @@ public class GameWorld
     private double _reloadTimer;
     private double _cooldown;
     private double _spawnTimer = 1;
+
+    public GameWorld() { }
+
+    // New patrol after making it home: keeps the score (and so the level), lives are repaired
+    public GameWorld(int startScore, int shields, int startLevel, int patrol = 1)
+    {
+        MaxTorpedoes = Math.Min(MaxTorpedoCap, BaseTorpedoes + (Math.Max(1, patrol) - 1));
+        Ammo = MaxTorpedoes;
+        Score = startScore;
+        _startScore = startScore;
+        ShieldsLeft = shields;
+        StartLevel = startLevel;
+        LevelUpTimeLeft = LevelUpBannerTime; // Show "LEVEL X" when the patrol starts
+    }
 
     public void Update(double dt, InputState input)
     {
@@ -88,6 +120,14 @@ public class GameWorld
         Player.Y = Math.Clamp(Player.Y, WaterLine + 6, SeaFloor - Player.Height);
 
         InvulnerableTimeLeft = Math.Max(0, InvulnerableTimeLeft - dt);
+        ShieldTimeLeft = Math.Max(0, ShieldTimeLeft - dt);
+
+        // Q: pop a bubble shield (one at a time)
+        if (input.ShieldPressed && ShieldsLeft > 0 && !IsShielded)
+        {
+            ShieldsLeft--;
+            ShieldTimeLeft = ShieldTime;
+        }
 
         _cooldown -= dt;
         if (input.Fire)
@@ -221,6 +261,18 @@ public class GameWorld
             bool hitsPlayer =
                 c.X < hitX + hitWidth && c.X + DepthCharge.Size > hitX &&
                 c.Y < hitY + hitHeight && c.Y + DepthCharge.Size > hitY;
+
+            // The bubble shield pops the charge without any damage
+            if (hitsPlayer && IsShielded)
+            {
+                Explosions.Add(new Explosion
+                {
+                    X = c.X + DepthCharge.Size / 2,
+                    Y = c.Y + DepthCharge.Size / 2
+                });
+                DepthCharges.RemoveAt(i);
+                continue;
+            }
 
             if (hitsPlayer && !IsInvulnerable)
             {

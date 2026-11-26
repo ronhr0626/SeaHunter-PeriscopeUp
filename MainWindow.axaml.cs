@@ -8,6 +8,7 @@ public partial class MainWindow : Window
 {
     private int _periscopeTorpedoes;
     private int _finalScore;
+    private bool _testMode;   // True when started from the TEST button: no high score is saved
 
     public MainWindow()
     {
@@ -21,8 +22,36 @@ public partial class MainWindow : Window
         StartHighScoreList.ItemsSource = HighScoreStore.Format(HighScoreStore.Load());
     }
 
-    private void OnStartClick(object? sender, RoutedEventArgs e) => StartGame();
-    private void OnPlayAgainClick(object? sender, RoutedEventArgs e) => StartGame();
+    private void OnStartClick(object? sender, RoutedEventArgs e)
+    {
+        _testMode = false;
+        StartGame();
+    }
+
+    // Test mode: start any patrol on any stage
+    private void OnTestClick(object? sender, RoutedEventArgs e)
+    {
+        _testMode = true;
+        int patrol = TestPatrolBox.SelectedIndex + 1;
+        int stage = TestStageBox.SelectedIndex + 1;
+
+        HideAllScreens();
+        Game.StartTest(patrol, stage);
+    }
+
+    private void HideAllScreens()
+    {
+        StartScreen.IsVisible = false;
+        GameOverScreen.IsVisible = false;
+        PeriscopeIntroScreen.IsVisible = false;
+        CrashDiveScreen.IsVisible = false;
+        HomeSafeScreen.IsVisible = false;
+    }
+    private void OnPlayAgainClick(object? sender, RoutedEventArgs e)
+    {
+        _testMode = false;
+        StartGame();
+    }
 
     private void OnMenuClick(object? sender, RoutedEventArgs e)
     {
@@ -37,16 +66,22 @@ public partial class MainWindow : Window
         GameOverScreen.IsVisible = false;
         PeriscopeIntroScreen.IsVisible = false;
         CrashDiveScreen.IsVisible = false;
+        HomeSafeScreen.IsVisible = false;
         Game.StartNewGame();
     }
 
     // Side view is over: show how many torpedoes the periscope round gets
     private void OnSideViewOver(int score, int level)
     {
-        _periscopeTorpedoes = level * PeriscopeWorld.TorpedoesPerLevel;
+        // Only levels actually played this patrol give torpedoes
+        int played = Game.LevelsPlayed;
+        _periscopeTorpedoes = played * PeriscopeWorld.TorpedoesPerLevel;
 
-        LevelReachedText.Text = $"LEVEL {level} REACHED   SCORE {score:D6}";
-        TorpedoCountText.Text = $"{_periscopeTorpedoes} TORPEDOES";
+        LevelReachedText.Text = $"LEVEL {level} REACHED ({played} played)   SCORE {score:D6}";
+        int destroyers = System.Math.Min(PeriscopeWorld.MaxHuntersPerWave, Game.Patrol);
+        TorpedoCountText.Text = destroyers == 1
+            ? $"{_periscopeTorpedoes} TORPEDOES"
+            : $"{_periscopeTorpedoes} TORPEDOES   –   DESTROYERS COME {destroyers} AT A TIME";
         PeriscopeIntroScreen.IsVisible = true;
     }
 
@@ -77,14 +112,27 @@ public partial class MainWindow : Window
 
     private void OnMinefieldOver(int score, bool madeItHome)
     {
-        GameOverTitle.Text = madeItHome ? "HOME SAFE!" : "GAME OVER";
-        ShowGameOver(score);
+        if (!madeItHome)
+        {
+            ShowGameOver(score);
+            return;
+        }
+
+        // Made it home: offer a new patrol with bubble shields
+        HomeScoreText.Text = $"SCORE {score:D6}   NEXT PATROL: LEVEL {Game.NextPatrolLevel}";
+        HomeSafeScreen.IsVisible = true;
+    }
+
+    private void OnNextPatrolClick(object? sender, RoutedEventArgs e)
+    {
+        HomeSafeScreen.IsVisible = false;
+        Game.StartNextPatrol();
     }
 
     private void ShowGameOver(int score)
     {
-        // Only save real scores
-        var top = score > 0 ? HighScoreStore.Add(score) : HighScoreStore.Load();
+        // Only save real scores, never from test mode
+        var top = score > 0 && !_testMode ? HighScoreStore.Add(score) : HighScoreStore.Load();
 
         FinalScoreText.Text = $"SCORE {score:D6}";
         NewHighScoreText.IsVisible = score > 0 && top[0] == score;

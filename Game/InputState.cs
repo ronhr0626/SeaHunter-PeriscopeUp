@@ -31,6 +31,7 @@ public class InputState
     public bool UpPressed => _pressed.Contains(PhysicalKey.W) || _pressed.Contains(PhysicalKey.ArrowUp);
     public bool DownPressed => _pressed.Contains(PhysicalKey.S) || _pressed.Contains(PhysicalKey.ArrowDown);
     public bool FlagPressed => _pressed.Contains(PhysicalKey.F);
+    public bool ShieldPressed => _pressed.Contains(PhysicalKey.Q);
     public bool LeftPressed => _pressed.Contains(PhysicalKey.A) || _pressed.Contains(PhysicalKey.ArrowLeft);
     public bool RightPressed => _pressed.Contains(PhysicalKey.D) || _pressed.Contains(PhysicalKey.ArrowRight);
 

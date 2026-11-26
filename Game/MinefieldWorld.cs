@@ -29,7 +29,9 @@ public class MinefieldWorld
 {
     // ===== Tweak these =====
     public const int Rows = 8;
-    public const int Cols = 40;                 // Length of the field, the harbor comes after
+    public const int BaseCols = 40;             // Length of the field on patrol 1, the harbor comes after
+    public const int ColsPerPatrol = 20;        // Each new patrol: this much longer way home
+    public const int MaxCols = 120;
     public const double CellSize = 40;          // Pixels in the 640x360 world
     public const double GridTop = 40;           // HUD strip above the grid
     public const int SubScreenCol = 3;          // Where on screen the sub sits (columns from the left)
@@ -48,7 +50,9 @@ public class MinefieldWorld
     public const int PingBonus = 100;           // Per ping left
     // =======================
 
-    public MineCell[,] Cells { get; } = new MineCell[Cols, Rows];
+    // Length of this field: 40 on patrol 1, 60 on patrol 2, 80 on patrol 3 ...
+    public int Cols { get; }
+    public MineCell[,] Cells { get; }
 
     public int Col { get; private set; }        // Sub's cell
     public int Row { get; private set; }
@@ -70,8 +74,11 @@ public class MinefieldWorld
     private readonly Random _rng = new();
     private double _endDelay = 1.5;
 
-    public MinefieldWorld(int destroyersSunk, int startScore)
+    public MinefieldWorld(int destroyersSunk, int startScore, int patrol = 1)
     {
+        Cols = Math.Min(MaxCols, BaseCols + (Math.Max(1, patrol) - 1) * ColsPerPatrol);
+        Cells = new MineCell[Cols, Rows];
+
         Pings = BasePings + destroyersSunk * PingsPerDestroyer;
         Score = startScore;
 
@@ -124,7 +131,7 @@ public class MinefieldWorld
         return count;
     }
 
-    private static bool Inside(int c, int r) => c >= 0 && c < Cols && r >= 0 && r < Rows;
+    private bool Inside(int c, int r) => c >= 0 && c < Cols && r >= 0 && r < Rows;
 
     public void Update(double dt, InputState input)
     {

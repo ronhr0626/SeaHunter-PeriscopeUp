@@ -93,12 +93,29 @@
                         </Grid>
 
                         <TextBlock Classes="body" Margin="0,8,0,0"
-                                   Text="3 lives. Every 1000 points: new level, more ships, more bombs."/>
+                                   Text="3 lives. Every 1000 points: new level, more ships, more bombs. Make it home through the minefield to earn 3 bubble shields (Q)."/>
                         <TextBlock Classes="body" TextWrapping="Wrap"
-                                   Text="When you are sunk: periscope up! 3 torpedoes per level reached. A D / ← → turns, SPACE fires. Aim ahead of the ship."/>
+                                   Text="When you are damaged: periscope up! 3 torpedoes per level played. A D / ← → turns, SPACE fires. Aim ahead of the ship."/>
 
-                        <Button Content="START" Click="OnStartClick" IsDefault="True"
-                                HorizontalAlignment="Left" Margin="0,14,0,0"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
+                            <Button Content="START" Click="OnStartClick" IsDefault="True"/>
+
+                            <!-- Test mode: jump straight to any patrol and stage. No high score is saved. -->
+                            <TextBlock Classes="body" Text="TEST:" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                            <ComboBox x:Name="TestPatrolBox" SelectedIndex="0" FontSize="10" VerticalAlignment="Center">
+                                <ComboBoxItem Content="Patrol 1 (lvl 1)"/>
+                                <ComboBoxItem Content="Patrol 2 (lvl 5)"/>
+                                <ComboBoxItem Content="Patrol 3 (lvl 10)"/>
+                                <ComboBoxItem Content="Patrol 4 (lvl 15)"/>
+                                <ComboBoxItem Content="Patrol 5 (lvl 20)"/>
+                            </ComboBox>
+                            <ComboBox x:Name="TestStageBox" SelectedIndex="0" FontSize="10" VerticalAlignment="Center">
+                                <ComboBoxItem Content="1 Side view"/>
+                                <ComboBoxItem Content="2 Periscope"/>
+                                <ComboBoxItem Content="3 Minefield"/>
+                            </ComboBox>
+                            <Button Content="TEST" Click="OnTestClick" FontSize="10" VerticalAlignment="Center"/>
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- Right: high scores -->
@@ -121,7 +138,7 @@
             <Viewbox Stretch="Uniform">
                 <Grid Width="640" Height="360">
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
-                        <TextBlock Classes="title" Text="SUNK!" HorizontalAlignment="Center"/>
+                        <TextBlock Classes="title" Text="DAMAGED!" HorizontalAlignment="Center"/>
                         <TextBlock x:Name="LevelReachedText" FontSize="16" Foreground="White"
                                    HorizontalAlignment="Center"/>
                         <TextBlock x:Name="TorpedoCountText" FontSize="14" FontWeight="Bold"
@@ -150,6 +167,24 @@
                         <TextBlock Classes="body" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"
                                    Text="A minefield lies between you and the harbor. W S / ↑ ↓ change depth, D / → move forward, SPACE sonar ping, F flag the cell ahead. Numbers = mines around that cell."/>
                         <Button Content="CONTINUE" Click="OnCrashDiveContinueClick" IsDefault="True"
+                                HorizontalAlignment="Center" Margin="0,12,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Viewbox>
+        </Border>
+
+        <!-- ===== HOME SAFE SCREEN (made it through the minefield) ===== -->
+        <Border x:Name="HomeSafeScreen" Background="#CC00101C" IsVisible="False">
+            <Viewbox Stretch="Uniform">
+                <Grid Width="640" Height="360">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6" Width="420">
+                        <TextBlock Classes="title" Text="HOME SAFE!" HorizontalAlignment="Center"/>
+                        <TextBlock FontSize="13" Foreground="White" TextWrapping="Wrap" TextAlignment="Center"
+                                   Text="Repairs complete. The boat is ready for a new patrol."/>
+                        <TextBlock x:Name="HomeScoreText" FontSize="16" Foreground="White" HorizontalAlignment="Center"/>
+                        <TextBlock FontSize="14" FontWeight="Bold" Foreground="#80D0FF" HorizontalAlignment="Center"
+                                   Text="Reward: 3 bubble shields – press Q"/>
+                        <Button Content="NEXT PATROL" Click="OnNextPatrolClick" IsDefault="True"
                                 HorizontalAlignment="Center" Margin="0,12,0,0"/>
                     </StackPanel>
                 </Grid>
