@@ -37,6 +37,7 @@ public class InputState
 
     // Periscope: hold to swing towards the closest destroyer
     public bool Track => _down.Contains(PhysicalKey.T) || _down.Contains(PhysicalKey.Q);
+    public bool TrackPressed => _pressed.Contains(PhysicalKey.T) || _pressed.Contains(PhysicalKey.Q);
 
     // One press = one shot, holding the key does not auto-fire
     public bool Fire => _pressed.Contains(PhysicalKey.Space);

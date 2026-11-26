@@ -118,6 +118,7 @@ public class PeriscopeWorld
     private readonly Random _rng = new();
     private double _spawnTimer;
     private double _turnSpeed = TurnSpeed;
+    private PeriShip? _trackTarget;   // Destroyer picked by the last Q press
 
     private double _hunterTimer = HunterInterval / 2; // First destroyer comes a bit earlier
 
@@ -179,8 +180,12 @@ public class PeriscopeWorld
 
     private void UpdateTurning(double dt, InputState input)
     {
-        // Q / T: swing the shortest way to the closest destroyer and stop on it
-        var hunter = ClosestHunter();
+        // Q / T: every new press picks the destroyer closest to where we are looking now,
+        // then swings to it and follows it while the key is held
+        if (input.TrackPressed || (_trackTarget != null && !Ships.Contains(_trackTarget)))
+            _trackTarget = HunterClosestToHeading();
+
+        var hunter = _trackTarget;
         if (input.Track && hunter != null)
         {
             double diff = Delta(hunter.Bearing, Heading);
@@ -199,6 +204,20 @@ public class PeriscopeWorld
 
         _turnSpeed = Math.Min(MaxTurnSpeed, _turnSpeed + TurnAcceleration * dt);
         Heading = ClampToArc(Heading + dir * _turnSpeed * dt);
+    }
+
+    // The destroyer with the smallest turn from where the periscope points now
+    private PeriShip? HunterClosestToHeading()
+    {
+        PeriShip? best = null;
+        double bestDiff = double.MaxValue;
+        foreach (var s in Ships)
+        {
+            if (!s.IsHunter) continue;
+            double diff = Math.Abs(Delta(s.Bearing, Heading));
+            if (diff < bestDiff) { best = s; bestDiff = diff; }
+        }
+        return best;
     }
 
     // Keeps a bearing inside the front half circle (bow +- ArcHalf)
