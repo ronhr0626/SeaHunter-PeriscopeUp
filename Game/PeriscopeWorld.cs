@@ -56,10 +56,11 @@ public class PeriscopeWorld
     public const double SpawnHalf = 80;          // Ships appear inside this, so they start in view range
     public const int TorpedoesPerLevel = 3;      // Torpedoes earned per level reached in the side view
     public const int MinTorpedoes = 3;           // Never fewer than this
-    public const int MaxTorpedoes = 15;          // Cap on patrol 1 only (stage 1 is easy there, so many levels get played)
+    public const int MaxTorpedoes = 15;          // Cap on patrol 1
+    public const int MaxTorpedoesPerPatrol = 5;  // The cap grows by this much each patrol (more destroyers to fight)
 
-    // Torpedo cap: 15 on patrol 1, no cap on later patrols (you rarely survive many levels there)
-    public static int TorpedoCap(int patrol) => patrol <= 1 ? MaxTorpedoes : int.MaxValue;
+    // Torpedo cap for a patrol: 15, 20, 25, 30 ...
+    public static int TorpedoCap(int patrol) => MaxTorpedoes + (Math.Max(1, patrol) - 1) * MaxTorpedoesPerPatrol;
     public const int TubeCount = 3;
     public const double TubeReloadTime = 3.0;    // Seconds per tube
     public const double TorpedoSpeed = 450;      // Meters per second (game speed, not real)
