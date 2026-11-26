@@ -18,6 +18,7 @@ public partial class MainWindow : Window
         Game.SideViewOver += OnSideViewOver;
         Game.GameOver += OnCrashDive;
         Game.MinefieldOver += OnMinefieldOver;
+        Game.QuitToMenu += OnQuitToMenu;
 
         StartHighScoreList.ItemsSource = HighScoreStore.Format(HighScoreStore.Load());
     }
@@ -37,6 +38,14 @@ public partial class MainWindow : Window
 
         HideAllScreens();
         Game.StartTest(patrol, stage);
+    }
+
+    // M on the pause screen
+    private void OnQuitToMenu()
+    {
+        HideAllScreens();
+        StartScreen.IsVisible = true;
+        StartHighScoreList.ItemsSource = HighScoreStore.Format(HighScoreStore.Load());
     }
 
     private void HideAllScreens()
@@ -75,7 +84,8 @@ public partial class MainWindow : Window
     {
         // Only levels actually played this patrol give torpedoes
         int played = Game.LevelsPlayed;
-        _periscopeTorpedoes = played * PeriscopeWorld.TorpedoesPerLevel;
+        _periscopeTorpedoes = System.Math.Clamp(played * PeriscopeWorld.TorpedoesPerLevel,
+            PeriscopeWorld.MinTorpedoes, PeriscopeWorld.TorpedoCap(Game.Patrol));
 
         LevelReachedText.Text = $"LEVEL {level} REACHED ({played} played)   SCORE {score:D6}";
         int destroyers = System.Math.Min(PeriscopeWorld.MaxHuntersPerWave, Game.Patrol);
@@ -129,15 +139,43 @@ public partial class MainWindow : Window
         Game.StartNextPatrol();
     }
 
+    private int _pendingScore;   // Score waiting for a name before it is saved
+
     private void ShowGameOver(int score)
     {
-        // Only save real scores, never from test mode
-        var top = score > 0 && !_testMode ? HighScoreStore.Add(score) : HighScoreStore.Load();
-
         FinalScoreText.Text = $"SCORE {score:D6}";
-        NewHighScoreText.IsVisible = score > 0 && top[0] == score;
-        GameOverHighScoreList.ItemsSource = HighScoreStore.Format(top);
+        NewHighScoreText.IsVisible = false;
+        GameOverHighScoreList.ItemsSource = HighScoreStore.Format(HighScoreStore.Load());
+
+        // Good enough for the list (and not a test run): ask for a name first
+        bool qualifies = !_testMode && HighScoreStore.Qualifies(score);
+        _pendingScore = qualifies ? score : 0;
+        ShowNameEntry(qualifies);
 
         GameOverScreen.IsVisible = true;
+        if (qualifies)
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => NameBox.Focus());
+    }
+
+    // Name entry and the play again / menu buttons are never shown at the same time
+    private void ShowNameEntry(bool show)
+    {
+        NameEntryPanel.IsVisible = show;
+        SaveNameButton.IsDefault = show;
+        GameOverButtons.IsVisible = !show;
+        PlayAgainButton.IsDefault = !show;
+        if (show) NameBox.Text = "";
+    }
+
+    private void OnSaveNameClick(object? sender, RoutedEventArgs e)
+    {
+        var top = HighScoreStore.Add(NameBox.Text ?? "", _pendingScore);
+
+        NewHighScoreText.IsVisible = top.Count > 0 && top[0].Score == _pendingScore;
+        GameOverHighScoreList.ItemsSource = HighScoreStore.Format(top);
+        StartHighScoreList.ItemsSource = HighScoreStore.Format(top);
+
+        _pendingScore = 0;
+        ShowNameEntry(false);
     }
 }

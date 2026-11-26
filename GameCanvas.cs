@@ -77,6 +77,12 @@ public class GameCanvas : Control
     // True while the periscope round is shown
     public bool InPeriscope { get; private set; }
 
+    // P / Esc pauses the game in every stage
+    public bool IsPaused { get; private set; }
+
+    // Raised when the player quits to the menu from the pause screen
+    public event Action? QuitToMenu;
+
     // True while the minefield (limping home) stage is shown
     public bool InMinefield { get; private set; }
 
@@ -129,6 +135,7 @@ public class GameCanvas : Control
         _minefield = null;
         InPeriscope = false;
         InMinefield = false;
+        IsPaused = false;
         IsRunning = true;
     }
 
@@ -159,6 +166,7 @@ public class GameCanvas : Control
         _minefield = null;
         InPeriscope = false;
         InMinefield = false;
+        IsPaused = false;
         IsRunning = true;
     }
 
@@ -173,6 +181,7 @@ public class GameCanvas : Control
         _minefield = null;
         InPeriscope = false;
         InMinefield = false;
+        IsPaused = false;
         IsRunning = true;
 
         if (stage == 2)
@@ -220,6 +229,27 @@ public class GameCanvas : Control
         // In menus, let keys reach the buttons (Enter, Tab, Space)
         if (!IsRunning) return;
 
+        // P / Esc: pause or resume
+        if (e.PhysicalKey is PhysicalKey.P or PhysicalKey.Escape)
+        {
+            IsPaused = !IsPaused;
+            e.Handled = true;
+            return;
+        }
+
+        if (IsPaused)
+        {
+            // M on the pause screen: quit to the menu
+            if (e.PhysicalKey == PhysicalKey.M)
+            {
+                IsPaused = false;
+                IsRunning = false;
+                QuitToMenu?.Invoke();
+            }
+            e.Handled = true;
+            return;
+        }
+
         _input.Press(e.PhysicalKey);
         e.Handled = true; // Stop Space etc. from clicking hidden buttons
     }
@@ -233,6 +263,14 @@ public class GameCanvas : Control
         double dt = _clock.Elapsed.TotalSeconds;
         _clock.Restart();
         dt = Math.Min(dt, 0.05); // Avoid huge jumps if the window freezes
+
+        // Paused: nothing moves, just keep drawing the frozen picture with the pause text
+        if (IsPaused)
+        {
+            _input.EndFrame();
+            InvalidateVisual();
+            return;
+        }
 
         _radarSweep = (_radarSweep + 120 * dt) % 360;
         _blink += dt;
@@ -296,28 +334,45 @@ public class GameCanvas : Control
         // Clip: anything outside the game world (like ships entering) is hidden in the black bars
         using (context.PushClip(new Rect(0, 0, GameWorld.Width, GameWorld.Height)))
         {
-            if (InMinefield && _minefield != null)
-            {
-                RenderMinefield(context, _minefield);
-                return;
-            }
+            RenderStage(context);
 
-            if (InPeriscope && _periscope != null)
-            {
-                RenderPeriscope(context, _periscope);
-                return;
-            }
-
-            context.DrawImage(_background, new Rect(0, 0, GameWorld.Width, GameWorld.Height));
-            DrawShips(context);
-            DrawDepthCharges(context);
-            DrawTorpedoes(context);
-            DrawSubmarine(context);
-            DrawExplosions(context);
-
-            if (IsRunning)
-                DrawHud(context);
+            if (IsPaused)
+                DrawPauseOverlay(context);
         }
+    }
+
+    private void RenderStage(DrawingContext context)
+    {
+        if (InMinefield && _minefield != null)
+        {
+            RenderMinefield(context, _minefield);
+            return;
+        }
+
+        if (InPeriscope && _periscope != null)
+        {
+            RenderPeriscope(context, _periscope);
+            return;
+        }
+
+        context.DrawImage(_background, new Rect(0, 0, GameWorld.Width, GameWorld.Height));
+        DrawShips(context);
+        DrawDepthCharges(context);
+        DrawTorpedoes(context);
+        DrawSubmarine(context);
+        DrawExplosions(context);
+
+        if (IsRunning)
+            DrawHud(context);
+    }
+
+    private static readonly IBrush PauseDimBrush = new SolidColorBrush(Color.Parse("#A0000814"));
+
+    private void DrawPauseOverlay(DrawingContext context)
+    {
+        context.FillRectangle(PauseDimBrush, new Rect(0, 0, GameWorld.Width, GameWorld.Height));
+        DrawColoredText(context, "PAUSED", GameWorld.Width / 2, 130, 32, AmmoFullBrush);
+        DrawColoredText(context, "P / ESC  RESUME        M  MENU", GameWorld.Width / 2, 180, 11, Brushes.White);
     }
 
     // Draws a sprite that faces right, mirrored when facingRight is false
@@ -741,7 +796,7 @@ public class GameCanvas : Control
             using (context.PushOpacity(Math.Min(1, (helpTime - p.Elapsed) / 1.5)))
             {
                 DrawColoredText(context, "A D / ← →  TURN  (HOLD = FASTER)", PeriCenterX, 222, 9, Brushes.White);
-                DrawColoredText(context, "Q  SWING TO DESTROYER     SPACE  FIRE", PeriCenterX, 234, 9, Brushes.White);
+                DrawColoredText(context, "HOLD Q  =  PERISCOPE SWINGS TO THE DESTROYER     SPACE  FIRE", PeriCenterX, 234, 9, Brushes.White);
             }
         }
 

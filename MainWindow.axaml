@@ -60,17 +60,17 @@
         <Border x:Name="StartScreen" Background="#CC00101C">
             <!-- Designed at 640x360 and scaled like the game -->
             <Viewbox Stretch="Uniform">
-                <Grid Width="640" Height="360" ColumnDefinitions="*,130" Margin="0">
+                <Grid Width="640" Height="360" ColumnDefinitions="*,175" Margin="0">
 
                     <!-- Left: title, story, controls, ships -->
-                    <StackPanel Margin="30,24,10,10" Spacing="2">
+                    <StackPanel Margin="24,20,8,8" Spacing="2">
                         <TextBlock Classes="title" Text="SEA HUNTER"/>
                         <TextBlock Classes="heading" Text="PERISCOPE UP" FontSize="14" Foreground="#FFD34D" Margin="0,0,0,2"/>
                         <TextBlock Classes="body" TextWrapping="Wrap" Margin="0,4,0,0"
                                    Text="You command a submarine. Sink as many ships as you can before their depth charges sink you."/>
 
                         <TextBlock Classes="heading" Text="CONTROLS"/>
-                        <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                        <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
                             <TextBlock Grid.Row="0" Classes="key" Text="A D / ← →"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Classes="body" Text="Move left and right"/>
                             <TextBlock Grid.Row="1" Classes="key" Text="W S / ↑ ↓"/>
@@ -78,7 +78,9 @@
                             <TextBlock Grid.Row="2" Classes="key" Text="SPACE"/>
                             <TextBlock Grid.Row="2" Grid.Column="1" Classes="body" Text="Fire torpedo (5+, then reload)"/>
                             <TextBlock Grid.Row="3" Classes="key" Text="Q"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" Classes="body" Text="Bubble shield  /  periscope: swing to destroyer"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Classes="body" Text="Bubble shield  /  periscope: hold Q to swing to the destroyer"/>
+                            <TextBlock Grid.Row="4" Classes="key" Text="P / ESC"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Classes="body" Text="Pause"/>
                         </Grid>
 
                         <TextBlock Classes="heading" Text="TARGETS"/>
@@ -119,7 +121,7 @@
                     </StackPanel>
 
                     <!-- Right: high scores -->
-                    <StackPanel Grid.Column="1" Margin="0,30,12,10" Spacing="1">
+                    <StackPanel Grid.Column="1" Margin="0,24,8,8" Spacing="0">
                         <TextBlock Classes="heading" Text="HIGH SCORES"/>
                         <ItemsControl x:Name="StartHighScoreList">
                             <ItemsControl.ItemTemplate>
@@ -144,7 +146,7 @@
                         <TextBlock x:Name="TorpedoCountText" FontSize="14" FontWeight="Bold"
                                    Foreground="#FFD34D" HorizontalAlignment="Center"/>
                         <TextBlock Classes="body" HorizontalAlignment="Center" Margin="0,6,0,0"
-                                   Text="A D / ← → turn (hold = faster)   Q / T swing to destroyer   SPACE fire"/>
+                                   Text="A D / ← → turn (hold = faster)   Hold Q = swing to the destroyer   SPACE fire"/>
                         <Button Content="PERISCOPE UP" Click="OnPeriscopeClick" IsDefault="True"
                                 HorizontalAlignment="Center" Margin="0,12,0,0"/>
                     </StackPanel>
@@ -194,7 +196,9 @@
         <!-- ===== GAME OVER SCREEN ===== -->
         <Border x:Name="GameOverScreen" Background="#CC00101C" IsVisible="False">
             <Viewbox Stretch="Uniform">
-                <Grid Width="640" Height="360">
+                <Grid Width="640" Height="360" ColumnDefinitions="*,200">
+
+                    <!-- Left: result, name entry and buttons -->
                     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
                         <TextBlock x:Name="GameOverTitle" Classes="title" Text="GAME OVER" HorizontalAlignment="Center"/>
                         <TextBlock x:Name="FinalScoreText" FontSize="16" Foreground="White"
@@ -203,20 +207,33 @@
                                    FontWeight="Bold" Foreground="#FFD34D" HorizontalAlignment="Center"
                                    IsVisible="False"/>
 
-                        <TextBlock Classes="heading" Text="HIGH SCORES" HorizontalAlignment="Center"/>
-                        <ItemsControl x:Name="GameOverHighScoreList" HorizontalAlignment="Center">
+                        <!-- Shown when the score makes the list -->
+                        <StackPanel x:Name="NameEntryPanel" Spacing="4" IsVisible="False" Margin="0,8,0,0">
+                            <TextBlock Classes="heading" Text="YOU MADE THE LIST! ENTER YOUR NAME" HorizontalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                <TextBox x:Name="NameBox" Width="150" MaxLength="12" FontSize="12"
+                                         Watermark="MAX 12 LETTERS"/>
+                                <Button x:Name="SaveNameButton" Content="SAVE" Click="OnSaveNameClick" IsDefault="True"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel x:Name="GameOverButtons" Orientation="Horizontal" Spacing="10"
+                                    HorizontalAlignment="Center" Margin="0,10,0,0">
+                            <Button x:Name="PlayAgainButton" Content="PLAY AGAIN" Click="OnPlayAgainClick" IsDefault="True"/>
+                            <Button Content="MENU" Click="OnMenuClick"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Right: top 15 -->
+                    <StackPanel Grid.Column="1" Margin="0,24,8,8" Spacing="0">
+                        <TextBlock Classes="heading" Text="HIGH SCORES"/>
+                        <ItemsControl x:Name="GameOverHighScoreList">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Classes="score" Text="{Binding}"/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-
-                        <StackPanel Orientation="Horizontal" Spacing="10"
-                                    HorizontalAlignment="Center" Margin="0,10,0,0">
-                            <Button Content="PLAY AGAIN" Click="OnPlayAgainClick" IsDefault="True"/>
-                            <Button Content="MENU" Click="OnMenuClick"/>
-                        </StackPanel>
                     </StackPanel>
                 </Grid>
             </Viewbox>
