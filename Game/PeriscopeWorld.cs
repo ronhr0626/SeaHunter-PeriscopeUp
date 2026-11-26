@@ -30,7 +30,7 @@ public class PeriShip
 
 public class PeriTorpedo
 {
-    public double Bearing { get; init; }
+    public double Bearing { get; set; }
     public double Range { get; set; }
 }
 
@@ -60,6 +60,8 @@ public class PeriscopeWorld
     public const double TubeReloadTime = 3.0;    // Seconds per tube
     public const double TorpedoSpeed = 450;      // Meters per second (game speed, not real)
     public const double TorpedoMaxRange = 5000;
+    public const double HomingWidth = 3;         // Torpedo locks on if it passes within 3x the ship's width
+    public const double HomingTurnRate = 4;      // Degrees per second the torpedo can steer
     public const double MinShipRange = 1200;
     public const double MaxShipRange = 4500;
     public const int MaxShips = 4;
@@ -312,6 +314,7 @@ public class PeriscopeWorld
             var t = Torpedoes[i];
             double before = t.Range;
             t.Range += TorpedoSpeed * dt;
+            SteerTorpedo(t, dt);
 
             // Hit if the torpedo passed the ship's range this frame while inside its width
             var hit = Ships.Find(s =>
@@ -332,6 +335,27 @@ public class PeriscopeWorld
             if (t.Range > TorpedoMaxRange)
                 Torpedoes.RemoveAt(i);
         }
+    }
+
+    // Homing: steer towards the closest ship ahead that is within 3x its width of our course
+    private void SteerTorpedo(PeriTorpedo t, double dt)
+    {
+        PeriShip? target = null;
+        double bestRange = double.MaxValue;
+
+        foreach (var s in Ships)
+        {
+            if (s.Range <= t.Range || s.Range >= bestRange) continue;   // Only ships still ahead
+            if (Math.Abs(Delta(s.Bearing, t.Bearing)) > s.AngularWidth / 2 * HomingWidth) continue;
+            target = s;
+            bestRange = s.Range;
+        }
+
+        if (target == null) return;
+
+        double diff = Delta(target.Bearing, t.Bearing);
+        double step = HomingTurnRate * dt;
+        t.Bearing = Normalize(t.Bearing + Math.Clamp(diff, -step, step));
     }
 
     // The ship closest to the crosshair, used for the target display

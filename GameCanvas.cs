@@ -614,7 +614,9 @@ public class GameCanvas : Control
         DrawText(context, $"{PeriscopeWorld.Delta(p.Heading, 0):+0;-0;0}°", PeriCenterX + 4, 50, 9);   // - = left of bow, + = right
 
         // Left lens: torpedoes in stock and the three tubes
-        DrawText(context, $"TORPEDOES {p.TorpedoesInStock}", 105, 36, 9);
+               // Stock plus the ones already loaded (or loading) in the tubes
+        int torpedoesLeft = p.TorpedoesInStock + Array.FindAll(p.Tubes, t => t >= 0).Length;
+        DrawText(context, $"TORPEDOES {torpedoesLeft}", 105, 36, 9);
         for (int i = 0; i < PeriscopeWorld.TubeCount; i++)
         {
             double tx = 105 + i * 22;
