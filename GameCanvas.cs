@@ -637,7 +637,9 @@ public class GameCanvas : Control
             DrawColoredText(context, "OUT OF TORPEDOES", PeriCenterX, 70, 12, WarningTextBrush);
 
         // Right lens: score
-        DrawText(context, $"SCORE {p.Score:D6}", 535, 36, 9, TextAlignment.Right);
+               // Destroyers sunk, and the sonar pings they give in the minefield
+        DrawColoredText(context, $"DESTROYERS {p.DestroyersSunk}", 495, 50, 9, WarningTextBrush);
+        DrawText(context, $"+{p.DestroyersSunk * MinefieldWorld.PingsPerDestroyer} PINGS", 535, 62, 8, TextAlignment.Right);
 
         // Fire lamp (bottom right): dark when no tube is ready
         if (!Array.Exists(p.Tubes, t => t == 0))
